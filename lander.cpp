@@ -13,11 +13,51 @@
 // ahg@eng.cam.ac.uk and gc121@eng.cam.ac.uk.
 
 #include "lander.h"
+#include "math.h"
+#include <fstream>
+#include <vector>
 
 void autopilot (void)
   // Autopilot to adjust the engine throttle, parachute and attitude control
-{
+{ 
   // INSERT YOUR CODE HERE
+    //define the constants
+    double Kh, Kp, lander_mass, delta, h, Pout;
+    lander_mass = FUEL_CAPACITY * fuel * FUEL_DENSITY + UNLOADED_LANDER_MASS;
+    delta = (GRAVITY * MARS_MASS * lander_mass / position.abs2()) / MAX_THRUST;
+    h = position.abs() - MARS_RADIUS;
+    
+    Kp = 2; //+ constant controls the gain Pout
+    Kh = 0.01; // + constant controls descent
+
+    double error = -(0.5 + Kh * h + velocity * position.norm());
+    Pout = Kp * error; //Controller gain
+
+    // use && when multiple conditions required
+    if (parachute_status == NOT_DEPLOYED && safe_to_deploy_parachute() && (h < 40000)) {
+        parachute_status == DEPLOYED;
+    } //Auto-Activation of parachute
+
+    //descent rate should decrease linearly as the lander approaches the surface
+    //error is positive if the lander is descending too quickly and negative if the lander is descending too slowly
+    // even when the error e approaches zero, we still need a certain amount of thrust to balance the weight.T
+    if (Pout <= -delta) { throttle = 0; } 
+    else if (Pout < 1 - delta) { throttle = delta + Pout; }
+    else { throttle = -1; }
+
+    ofstream fout;
+    if (simulation_time == 0) { fout.open("autopilot.txt"); } //time = 0, open file, empty file every time
+    else { fout.open("autopilot.txt", fstream::app); } //when time != 0, write into the file 
+    
+    //write variable values to file 
+    if (fout) { // file opened successfully
+        fout << h << ' ' << Kh * h << ' ' << -1* velocity * position.norm() << endl;
+        //Target descent rate = Kh * h, Actual descent rate = v * er
+    }
+    else { // file not opened
+        cout << "Could not open autopilot file for writing" << endl;
+    }
+    fout.close();
 }
 
 void numerical_dynamics (void)
@@ -25,6 +65,52 @@ void numerical_dynamics (void)
   // lander's pose. The time step is delta_t (global variable).
 {
   // INSERT YOUR CODE HERE
+  //FIND acceleration
+    //define variables
+    double mass, rho, lander_area, chute_area;
+    vector3d drag_lander, drag_chute, drag_f, gravity_f, thr, acceleration;
+
+    //calculate total mass = lander + fuel, m = density*volume
+    mass = FUEL_CAPACITY * fuel * FUEL_DENSITY + UNLOADED_LANDER_MASS;
+    //calculate gravity force = GMm/r^2 * r^
+    gravity_f = (GRAVITY * MARS_MASS * mass) * (- position.norm()) / position.abs2();
+    //calculate thrust
+    thr = thrust_wrt_world();
+
+    rho = atmospheric_density(position);
+    lander_area = 3.1415 * pow(LANDER_SIZE, 2);
+    chute_area = 5 * pow(2.0 * LANDER_SIZE, 2);
+    drag_lander = -0.5 * rho * DRAG_COEF_LANDER * lander_area * velocity.abs2() * velocity.norm();
+    drag_chute = -0.5 * rho * DRAG_COEF_CHUTE * chute_area * velocity.abs2() * velocity.norm();
+    
+    //calculate drag force
+    if (parachute_status == DEPLOYED) {
+        drag_f = drag_lander + drag_chute;
+    }
+    else {
+        drag_f = drag_lander;
+    }
+
+    //calculate accleration = F/m
+    acceleration = (thr + gravity_f + drag_f) / mass;
+  
+  //Verlet integrator
+    static vector3d previous_position;
+    vector3d new_position;
+    if (simulation_time == 0.0) {
+        new_position = position + delta_t * velocity;
+        velocity = velocity + delta_t * acceleration;
+    }
+
+    else {
+        new_position = position + delta_t * velocity;
+        velocity = velocity + delta_t * acceleration;
+        //new_position = 2 * position - previous_position + pow(delta_t, 2) * acceleration;
+        //velocity = (new_position - position) / delta_t;
+    }
+
+    previous_position = position;
+    position = new_position;
 
   // Here we can apply an autopilot to adjust the thrust, parachute and attitude
   if (autopilot_enabled) autopilot();

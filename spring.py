@@ -1,7 +1,9 @@
 # uncomment the next line if running in a notebook
 #%matplotlib inline
+import time
 import numpy as np
 import matplotlib.pyplot as plt
+start = time.time()
 
 # mass, spring constant, initial position and velocity
 m = 1
@@ -44,4 +46,5 @@ plt.plot(t_array, v_array, label='v (m/s)')
 plt.legend()
 plt.show()
 
-print(x_array)
+end = time.time()
+print("Execution Time: ", end - start)

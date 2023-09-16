@@ -45,8 +45,8 @@ int main() {
   } else { // file did not open successfully
     cout << "Could not open trajectory file for writing" << endl;
   }
-
-  /* The file can be loaded and visualised in Python as follows:
+}
+/* The file can be loaded and visualised in Python as follows:
 
   import numpy as np
   import matplotlib.pyplot as plt
@@ -61,4 +61,3 @@ int main() {
   plt.show()
 
   */
-}
